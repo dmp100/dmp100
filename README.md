@@ -1,6 +1,29 @@
 ### hE11O tHeRe 👋
 
 
+![anime-retro](https://user-images.githubusercontent.com/107687577/226801966-d6e476d3-569d-4b53-b052-4be67151443a.gif)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 <!--
 **dmp100/dmp100** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
