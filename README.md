@@ -6,8 +6,8 @@
   
 </p>
 
-<h1 align="center">Hi, I'm <a href="https://www.edisonlee55.com">Edison Lee</a>!</h1>
-<h1 align="center">Welcome to my GitHub profile~ OwO</h1>
+<h1 align="center">Hi, I'm <a href="https://velog.io/@dmp100">DMP !</a>!</h1>
+<h1 align="center">Welcome to my GitHub profile ! !</h1>
 
 
 
