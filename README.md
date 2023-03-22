@@ -1,4 +1,4 @@
-### hE11O tHeRe 👋
+
 
 
 ![anime-retro](https://user-images.githubusercontent.com/107687577/226801966-d6e476d3-569d-4b53-b052-4be67151443a.gif)
@@ -7,7 +7,7 @@
 
 
 
-
+![Top Langs](https://github-readme-stats.vercel.app/api/top-langs/?username=dmp100&layout=dark&theme=onedark)
 
 
 
