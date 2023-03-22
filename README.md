@@ -6,7 +6,8 @@
   
 </p>
 
-
+<h1 align="center">Hi, I'm <a href="https://www.edisonlee55.com">Edison Lee</a>!</h1>
+<h1 align="center">Welcome to my GitHub profile~ OwO</h1>
 
 
 
@@ -34,4 +35,4 @@ Here are some ideas to get you started:
 - 😄 Pronouns: ...
 - ⚡ Fun fact: ...
 -->
-![dmp100's GitHub stats](https://github-readme-stats.vercel.app/api?username=dmp100&show_icons=true&theme=radical)
+
