@@ -7,7 +7,7 @@
 </p>
 
 <h1 align="center">Yo,sup I'm <a href="https://velog.io/@dmp100">DMP100</a>!</h1>
-<h1 align="center">Im just making some SHIT</h1>
+<h1 align="center"> I'm just making some SHIT</h1>
 
 
 
