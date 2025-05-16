@@ -2,10 +2,9 @@ name: Rotate GIF Sequentially
 
 on:
   schedule:
-    - cron: "*/1 * * * *"  # 테스트용: 1분마다 실행
+    - cron: "*/1 * * * *"  # 테스트용: 1분마다 실행 (그대로 유지)
   workflow_dispatch:
 
-# 이 부분을 추가하세요
 permissions:
   contents: write
   
@@ -26,35 +25,62 @@ jobs:
       run: |
         import os
         import shutil
+        import datetime
 
+        # 현재 시간을 로그에 기록
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"Workflow running at: {current_time}")
+
+        # 디렉토리 확인 및 생성
         gif_dir = "gifs"
+        if not os.path.exists(gif_dir):
+            print(f"Creating directory: {gif_dir}")
+            os.makedirs(gif_dir)
+            print("Please add GIF files to the 'gifs' directory")
+            exit(0)
+
         index_file = "gif_index.txt"
         target_file = "anime-retro.gif"
 
+        # GIF 파일 목록 가져오기
         gifs = sorted([f for f in os.listdir(gif_dir) if f.endswith(".gif")])
+        print(f"Found {len(gifs)} GIF files: {gifs}")
 
         if not gifs:
-            raise Exception("No GIFs found.")
+            print("No GIFs found in the 'gifs' directory.")
+            exit(0)
 
-        # read current index
+        # 현재 인덱스 읽기
         index = 0
         if os.path.exists(index_file):
-            with open(index_file, "r") as f:
-                index = int(f.read().strip())
+            try:
+                with open(index_file, "r") as f:
+                    content = f.read().strip()
+                    if content:
+                        index = int(content.split('\n')[0])
+            except Exception as e:
+                print(f"Error reading index file: {e}")
 
-        # bound check
+        # 유효성 검사
         index = index % len(gifs)
         selected = gifs[index]
+        print(f"Selected GIF: {selected} (index {index})")
 
-        # copy selected gif
+        # 타겟 파일이 존재하면 먼저 삭제 (변경 감지 보장)
+        if os.path.exists(target_file):
+            os.remove(target_file)
+            
+        # GIF 복사
         shutil.copyfile(os.path.join(gif_dir, selected), target_file)
+        print(f"Copied {selected} to {target_file}")
 
-        # update index
+        # 다음 인덱스 업데이트 (타임스탬프 포함)
         next_index = (index + 1) % len(gifs)
         with open(index_file, "w") as f:
-            f.write(str(next_index))
-
-        print(f"Copied {selected} → {target_file}, next index = {next_index}")
+            f.write(f"{next_index}\n# Last updated: {current_time}")
+        
+        print(f"Updated index to {next_index}")
+        print(f"Next GIF will be: {gifs[next_index]}")
 
       shell: python
 
@@ -62,6 +88,6 @@ jobs:
       run: |
         git config user.name github-actions
         git config user.email github-actions@github.com
-        git add anime-retro.gif gif_index.txt
-        git commit -m "Update GIF sequentially" || echo "No changes"
+        git add -f anime-retro.gif gif_index.txt
+        git commit -m "Update GIF $(date +%H:%M:%S)"
         git push
