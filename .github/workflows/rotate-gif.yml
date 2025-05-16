@@ -1,99 +1,63 @@
-name: Rotate GIF
+name: Rotate GIF Sequentially
 
 on:
-  push:  # 모든 push에 반응
   schedule:
-    - cron: "*/1 * * * *"  # 매 분마다 실행
-  workflow_dispatch:  # 수동 실행도 가능
-
-permissions:
-  contents: write
+    - cron: "*/1 * * * *"  # 테스트용: 1분마다 실행
+  workflow_dispatch:
 
 jobs:
-  update-gif:
+  rotate:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
 
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: 3.x
 
-    - name: Check if triggered by our own commit
-      id: check-trigger
+    - name: Rotate GIF sequentially
       run: |
-        COMMIT_MSG=$(git log -1 --pretty=%B)
-        if [[ "$COMMIT_MSG" == *"Update GIF"* ]]; then
-          echo "skip=true" >> $GITHUB_OUTPUT
-        else
-          echo "skip=false" >> $GITHUB_OUTPUT
-        fi
+        import os
+        import shutil
 
-    - name: Rotate GIF
-      if: steps.check-trigger.outputs.skip != 'true'
-      run: |
-        import os, shutil, time, json
-        
-        # gifs 디렉토리가 없으면 생성
-        if not os.path.exists("gifs"):
-            os.makedirs("gifs")
-            print("Created gifs directory")
-            exit(0)
-        
         gif_dir = "gifs"
-        target_gif = "anime-retro.gif"
-        index_file = "gif_index.json"
-        
-        # 원본 파일 백업 (처음 실행 시)
-        if not os.path.exists("original-retro.gif") and os.path.exists(target_gif):
-            shutil.copy(target_gif, "original-retro.gif")
-            print("Backed up original anime-retro.gif")
-            # 원본 파일도 gifs 폴더에 복사
-            shutil.copy(target_gif, os.path.join(gif_dir, "original-retro.gif"))
-        
-        # GIF 파일 목록 가져오기
+        index_file = "gif_index.txt"
+        target_file = "anime-retro.gif"
+
         gifs = sorted([f for f in os.listdir(gif_dir) if f.endswith(".gif")])
-        
-        # GIF 파일이 없으면 오류 메시지 출력
+
         if not gifs:
-            print("Error: No GIF files found in gifs directory!")
-            exit(1)
-        
-        # 현재 인덱스 가져오기
-        current_index = 0
+            raise Exception("No GIFs found.")
+
+        # read current index
+        index = 0
         if os.path.exists(index_file):
-            try:
-                with open(index_file, 'r') as f:
-                    data = json.load(f)
-                    current_index = data.get('index', 0)
-            except:
-                print("Error reading index file, starting from 0")
-        
-        # 다음 인덱스 계산
-        next_index = (current_index + 1) % len(gifs)
-        chosen = gifs[next_index]
-        
-        # 인덱스 저장
-        with open(index_file, 'w') as f:
-            json.dump({'index': next_index, 'last_updated': time.time()}, f)
-        
-        print(f"Selected GIF: {chosen} (index {next_index+1} of {len(gifs)})")
-        
-        # 선택된 GIF를 타겟 파일로 복사
-        shutil.copyfile(os.path.join(gif_dir, chosen), target_gif)
+            with open(index_file, "r") as f:
+                index = int(f.read().strip())
+
+        # bound check
+        index = index % len(gifs)
+        selected = gifs[index]
+
+        # copy selected gif
+        shutil.copyfile(os.path.join(gif_dir, selected), target_file)
+
+        # update index
+        next_index = (index + 1) % len(gifs)
+        with open(index_file, "w") as f:
+            f.write(str(next_index))
+
+        print(f"Copied {selected} → {target_file}, next index = {next_index}")
+
       shell: python
 
-    - name: Commit and push if changed
-      if: steps.check-trigger.outputs.skip != 'true'
+    - name: Commit and push
       run: |
-        git config user.name "github-actions"
-        git config user.email "github-actions@github.com"
-        git add anime-retro.gif
-        git add gif_index.json
-        git diff --quiet || git commit -m "Update GIF: $(date '+%Y-%m-%d %H:%M:%S')" 
-        git push || echo "No changes to push"
+        git config user.name github-actions
+        git config user.email github-actions@github.com
+        git add anime-retro.gif gif_index.txt
+        git commit -m "Update GIF sequentially" || echo "No changes"
+        git push
