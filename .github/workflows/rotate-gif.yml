@@ -1,10 +1,11 @@
 name: Rotate GIF
 
 on:
+  push:
+    paths:
+      - 'gifs/**'  # gifs 폴더의 파일이 변경되면 실행
   schedule:
-    - cron: "*/1 * * * *"  # 매 분 0초에 실행
-    - cron: "20 * * * *"   # 매 시간 20초에 실행
-    - cron: "40 * * * *"   # 매 시간 40초에 실행
+    - cron: "*/1 * * * *"  # 1분마다 실행 (백업)
   workflow_dispatch:       # 수동 실행도 가능
 
 permissions:
@@ -17,15 +18,31 @@ jobs:
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
+      with:
+        fetch-depth: 0  # 전체 히스토리 가져오기
 
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: 3.x
 
-    - name: Rotate GIF
+    - name: Check if triggered by GIF upload
+      id: check-trigger
       run: |
-        import os, random, shutil, time
+        # 가장 최근 커밋 메시지 확인
+        COMMIT_MSG=$(git log -1 --pretty=%B)
+        # GitHub Actions에 의한 커밋인지 확인
+        if [[ "$COMMIT_MSG" == *"Update GIF"* ]]; then
+          echo "Skipping as this was triggered by our own commit"
+          echo "skip=true" >> $GITHUB_OUTPUT
+        else
+          echo "skip=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Rotate GIF
+      if: steps.check-trigger.outputs.skip != 'true'
+      run: |
+        import os, random, shutil, time, sys
         
         # gifs 디렉토리가 없으면 생성
         if not os.path.exists("gifs"):
@@ -44,49 +61,45 @@ jobs:
         # GIF 파일 목록 가져오기
         gifs = [f for f in os.listdir(gif_dir) if f.endswith(".gif")]
         
-        # 백업한 원본 파일 추가 (있는 경우)
-        if os.path.exists("original-retro.gif"):
-            gifs.append("../original-retro.gif")
-        
         # GIF 파일이 없으면 오류 메시지 출력
         if not gifs:
             print("Error: No GIF files found in gifs directory!")
             exit(1)
         
-        # 현재 파일과 다른 파일 선택하기 (변화가 보이도록)
-        current_gif = None
-        if os.path.exists(target_gif):
-            # 현재 파일의 수정 시간 확인
-            mod_time = os.path.getmtime(target_gif)
-            # 10초 이내에 수정된 파일이면 현재 사용 중인 파일로 간주
-            if time.time() - mod_time < 10:
-                for g in gifs:
-                    if g == "../original-retro.gif":
-                        if os.path.getsize("original-retro.gif") == os.path.getsize(target_gif):
-                            current_gif = g
-                            break
-                    elif os.path.getsize(os.path.join(gif_dir, g)) == os.path.getsize(target_gif):
-                        current_gif = g
-                        break
+        # 'push' 이벤트인 경우 새로 업로드된 GIF 파일 찾기
+        event_name = os.environ.get('GITHUB_EVENT_NAME')
+        new_gif = None
         
-        # 다른 파일 선택 (현재 파일 제외)
-        available_gifs = [g for g in gifs if g != current_gif]
-        if not available_gifs:  # 선택할 파일이 없으면 모든 파일 사용
-            available_gifs = gifs
+        if event_name == 'push':
+            # git diff로 최근 커밋에서 변경된 파일 찾기
+            import subprocess
+            try:
+                result = subprocess.run(['git', 'diff', '--name-only', 'HEAD~1', 'HEAD'], 
+                                       capture_output=True, text=True, check=True)
+                changed_files = result.stdout.splitlines()
+                # gifs/ 디렉토리의 새 파일만 필터링
+                new_gifs = [f.split('/')[-1] for f in changed_files 
+                           if f.startswith('gifs/') and f.endswith('.gif')]
+                if new_gifs:
+                    new_gif = new_gifs[-1]  # 가장 최근에 추가된 GIF 선택
+                    print(f"New GIF detected: {new_gif}")
+            except Exception as e:
+                print(f"Error detecting new GIF: {e}")
         
-        chosen = random.choice(available_gifs)
-        
-        # 선택된 파일이 원본 백업인 경우
-        if chosen == "../original-retro.gif":
-            shutil.copyfile("original-retro.gif", target_gif)
-            print("Selected original GIF")
+        # 새 GIF가 있으면 그것을 사용, 없으면 랜덤 선택
+        if new_gif and new_gif in gifs:
+            chosen = new_gif
+            print(f"Using newly uploaded GIF: {chosen}")
         else:
-            # 선택된 GIF를 타겟 파일로 복사
-            shutil.copyfile(os.path.join(gif_dir, chosen), target_gif)
-            print(f"Selected GIF: {chosen}")
+            chosen = random.choice(gifs)
+            print(f"Randomly selected GIF: {chosen}")
+        
+        # 선택된 GIF를 타겟 파일로 복사
+        shutil.copyfile(os.path.join(gif_dir, chosen), target_gif)
       shell: python
 
     - name: Commit and push if changed
+      if: steps.check-trigger.outputs.skip != 'true'
       run: |
         git config user.name "github-actions"
         git config user.email "github-actions@github.com"
