@@ -1,0 +1,43 @@
+name: Rotate GIF
+
+on:
+  schedule:
+    - cron: "*/1 * * * *"  # 1분마다 실행 (테스트용, 나중에 수정 권장)
+  workflow_dispatch:       # 수동 실행도 가능
+
+jobs:
+  update-gif:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.x
+
+    - name: Rotate GIF
+      run: |
+        import os, random, shutil
+
+        gif_dir = "gifs"
+        target_gif = "anime-retro.gif"
+
+        gifs = [f for f in os.listdir(gif_dir) if f.endswith(".gif")]
+        chosen = random.choice(gifs)
+
+        shutil.copyfile(os.path.join(gif_dir, chosen), target_gif)
+
+        print(f"Selected GIF: {chosen}")
+
+      shell: python
+
+    - name: Commit and push if changed
+      run: |
+        git config user.name "github-actions"
+        git config user.email "github-actions@github.com"
+        git add anime-retro.gif
+        git commit -m "Update GIF" || echo "No changes"
+        git push
