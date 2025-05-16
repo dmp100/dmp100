@@ -2,10 +2,11 @@ name: Rotate GIF
 
 on:
   schedule:
-    - cron: "*/1 * * * *"  # 1분마다 실행 (테스트용, 나중에 수정 권장)
+    - cron: "*/1 * * * *"  # 매 분 0초에 실행
+    - cron: "20 * * * *"   # 매 시간 20초에 실행
+    - cron: "40 * * * *"   # 매 시간 40초에 실행
   workflow_dispatch:       # 수동 실행도 가능
 
-# 권한 설정 추가
 permissions:
   contents: write
 
@@ -24,7 +25,7 @@ jobs:
 
     - name: Rotate GIF
       run: |
-        import os, random, shutil
+        import os, random, shutil, time
         
         # gifs 디렉토리가 없으면 생성
         if not os.path.exists("gifs"):
@@ -35,21 +36,54 @@ jobs:
         gif_dir = "gifs"
         target_gif = "anime-retro.gif"
         
+        # 원본 파일 백업 (처음 실행 시)
+        if not os.path.exists("original-retro.gif") and os.path.exists(target_gif):
+            shutil.copy(target_gif, "original-retro.gif")
+            print("Backed up original anime-retro.gif")
+        
         # GIF 파일 목록 가져오기
         gifs = [f for f in os.listdir(gif_dir) if f.endswith(".gif")]
+        
+        # 백업한 원본 파일 추가 (있는 경우)
+        if os.path.exists("original-retro.gif"):
+            gifs.append("../original-retro.gif")
         
         # GIF 파일이 없으면 오류 메시지 출력
         if not gifs:
             print("Error: No GIF files found in gifs directory!")
             exit(1)
         
-        # 랜덤으로 GIF 선택
-        chosen = random.choice(gifs)
+        # 현재 파일과 다른 파일 선택하기 (변화가 보이도록)
+        current_gif = None
+        if os.path.exists(target_gif):
+            # 현재 파일의 수정 시간 확인
+            mod_time = os.path.getmtime(target_gif)
+            # 10초 이내에 수정된 파일이면 현재 사용 중인 파일로 간주
+            if time.time() - mod_time < 10:
+                for g in gifs:
+                    if g == "../original-retro.gif":
+                        if os.path.getsize("original-retro.gif") == os.path.getsize(target_gif):
+                            current_gif = g
+                            break
+                    elif os.path.getsize(os.path.join(gif_dir, g)) == os.path.getsize(target_gif):
+                        current_gif = g
+                        break
         
-        # 선택된 GIF를 타겟 파일로 복사
-        shutil.copyfile(os.path.join(gif_dir, chosen), target_gif)
+        # 다른 파일 선택 (현재 파일 제외)
+        available_gifs = [g for g in gifs if g != current_gif]
+        if not available_gifs:  # 선택할 파일이 없으면 모든 파일 사용
+            available_gifs = gifs
         
-        print(f"Successfully selected GIF: {chosen}")
+        chosen = random.choice(available_gifs)
+        
+        # 선택된 파일이 원본 백업인 경우
+        if chosen == "../original-retro.gif":
+            shutil.copyfile("original-retro.gif", target_gif)
+            print("Selected original GIF")
+        else:
+            # 선택된 GIF를 타겟 파일로 복사
+            shutil.copyfile(os.path.join(gif_dir, chosen), target_gif)
+            print(f"Selected GIF: {chosen}")
       shell: python
 
     - name: Commit and push if changed
@@ -57,5 +91,5 @@ jobs:
         git config user.name "github-actions"
         git config user.email "github-actions@github.com"
         git add anime-retro.gif
-        git commit -m "Update GIF: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
-        git push
+        git diff --quiet || git commit -m "Update GIF: $(date '+%Y-%m-%d %H:%M:%S')" 
+        git push || echo "No changes to push"
