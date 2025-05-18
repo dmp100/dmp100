@@ -1,9 +1,9 @@
-name: Rotate GIF Sequentially
+name: Test GIF Rotation Every 5 Minutes
 
 on:
   schedule:
-    - cron: "0 15 * * *"  # 한국 시간 자정 (UTC+9 기준)
-  workflow_dispatch:      # 수동 실행 옵션 유지
+    - cron: "*/5 * * * *"  # 5분 간격으로 실행
+  workflow_dispatch:       # 수동 실행 옵션 유지
 
 permissions:
   contents: write
@@ -41,6 +41,7 @@ jobs:
 
         index_file = "gif_index.txt"
         target_file = "anime-retro.gif"
+        cache_version_file = "cache_version.txt"
 
         # GIF 파일 목록 가져오기
         gifs = sorted([f for f in os.listdir(gif_dir) if f.endswith(".gif")])
@@ -61,6 +62,17 @@ jobs:
             except Exception as e:
                 print(f"Error reading index file: {e}")
 
+        # 캐시 버스팅 버전 읽기
+        cache_version = 1
+        if os.path.exists(cache_version_file):
+            try:
+                with open(cache_version_file, "r") as f:
+                    content = f.read().strip()
+                    if content:
+                        cache_version = int(content)
+            except Exception as e:
+                print(f"Error reading cache version file: {e}")
+
         # 유효성 검사
         index = index % len(gifs)
         selected = gifs[index]
@@ -79,15 +91,49 @@ jobs:
         with open(index_file, "w") as f:
             f.write(f"{next_index}\n# Last updated: {current_time}")
         
+        # 캐시 버스팅 버전 업데이트
+        new_cache_version = cache_version + 1
+        with open(cache_version_file, "w") as f:
+            f.write(str(new_cache_version))
+        
         print(f"Updated index to {next_index}")
+        print(f"Updated cache version to {new_cache_version}")
         print(f"Next GIF will be: {gifs[next_index]}")
 
+        # README.md 파일이 존재하면 캐시 버스팅 파라미터 업데이트
+        if os.path.exists("README.md"):
+            try:
+                with open("README.md", "r") as f:
+                    readme_content = f.read()
+                
+                # 기존 캐시 버스팅 파라미터가 있는지 확인
+                import re
+                updated_content = re.sub(
+                    r'(anime-retro\.gif\?cache-bust=)[0-9]+', 
+                    f'\\1{new_cache_version}', 
+                    readme_content
+                )
+                
+                # 기존 파라미터가 없는 경우 anime-retro.gif를 찾아 파라미터 추가
+                if updated_content == readme_content:
+                    updated_content = re.sub(
+                        r'(anime-retro\.gif)(?!\?)', 
+                        f'\\1?cache-bust={new_cache_version}', 
+                        readme_content
+                    )
+                
+                with open("README.md", "w") as f:
+                    f.write(updated_content)
+                
+                print("Updated README.md with new cache busting parameter")
+            except Exception as e:
+                print(f"Error updating README.md: {e}")
       shell: python
 
     - name: Commit and push
       run: |
         git config user.name "KyuHyeon Sung"
         git config user.email "dmp100@naver.com"
-        git add -f anime-retro.gif gif_index.txt
+        git add -f anime-retro.gif gif_index.txt cache_version.txt README.md
         git commit -m "Update GIF $(date +%H:%M:%S)"
         git push
