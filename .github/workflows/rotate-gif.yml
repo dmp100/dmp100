@@ -2,12 +2,12 @@ name: Daily GIF Rotation at KST Midnight
 
 on:
   schedule:
-    - cron: "5 15 * * *"  # 한국 시간 00:05 (UTC+9 기준으로 15:05)
-  workflow_dispatch:       # 수동 실행 옵션 유지
+    - cron: "5 15 * * *"  # 한국 시간 00:05 (UTC+9 기준)
+  workflow_dispatch:       # 수동 실행 가능
 
 permissions:
   contents: write
-  
+
 jobs:
   rotate:
     runs-on: ubuntu-latest
@@ -26,28 +26,28 @@ jobs:
         import os
         import shutil
         import datetime
+        import re
         from datetime import timezone, timedelta
 
-        # 현재 시간을 한국 시간(KST)으로 기록
+        # 현재 시간을 KST로 설정
         kst = timezone(timedelta(hours=9))
         utc_time = datetime.datetime.now(timezone.utc)
         kst_time = utc_time.astimezone(kst)
         current_time = kst_time.strftime("%Y-%m-%d %H:%M:%S KST")
         print(f"Workflow running at: {current_time}")
 
-        # 디렉토리 확인 및 생성
         gif_dir = "gifs"
+        index_file = "gif_index.txt"
+        target_file = "anime-retro.gif"
+        cache_version_file = "cache_version.txt"
+
+        # GIF 목록 불러오기
         if not os.path.exists(gif_dir):
             print(f"Creating directory: {gif_dir}")
             os.makedirs(gif_dir)
             print("Please add GIF files to the 'gifs' directory")
             exit(0)
 
-        index_file = "gif_index.txt"
-        target_file = "anime-retro.gif"
-        cache_version_file = "cache_version.txt"
-
-        # GIF 파일 목록 가져오기
         gifs = sorted([f for f in os.listdir(gif_dir) if f.endswith(".gif")])
         print(f"Found {len(gifs)} GIF files: {gifs}")
 
@@ -55,7 +55,6 @@ jobs:
             print("No GIFs found in the 'gifs' directory.")
             exit(0)
 
-        # 현재 인덱스 읽기
         index = 0
         if os.path.exists(index_file):
             try:
@@ -66,7 +65,6 @@ jobs:
             except Exception as e:
                 print(f"Error reading index file: {e}")
 
-        # 캐시 버스팅 버전 읽기
         cache_version = 1
         if os.path.exists(cache_version_file):
             try:
@@ -77,61 +75,74 @@ jobs:
             except Exception as e:
                 print(f"Error reading cache version file: {e}")
 
-        # 유효성 검사
         index = index % len(gifs)
         selected = gifs[index]
         print(f"Selected GIF: {selected} (index {index})")
 
-        # 타겟 파일이 존재하면 먼저 삭제 (변경 감지 보장)
         if os.path.exists(target_file):
             os.remove(target_file)
-            
-        # GIF 복사
+
         shutil.copyfile(os.path.join(gif_dir, selected), target_file)
         print(f"Copied {selected} to {target_file}")
 
-        # 다음 인덱스 업데이트 (타임스탬프 포함)
         next_index = (index + 1) % len(gifs)
         with open(index_file, "w") as f:
             f.write(f"{next_index}\n# Last updated: {current_time}")
-        
-        # 캐시 버스팅 버전 업데이트
+
         new_cache_version = cache_version + 1
         with open(cache_version_file, "w") as f:
             f.write(str(new_cache_version))
-        
+
         print(f"Updated index to {next_index}")
         print(f"Updated cache version to {new_cache_version}")
         print(f"Next GIF will be: {gifs[next_index]}")
 
-        # README.md 파일이 존재하면 캐시 버스팅 파라미터 업데이트
+        # README.md 캐시 버스팅 안전 업데이트
         if os.path.exists("README.md"):
             try:
                 with open("README.md", "r") as f:
                     readme_content = f.read()
-                
-                # 기존 캐시 버스팅 파라미터가 있는지 확인
-                import re
-                updated_content = re.sub(
-                    r'(anime-retro\.gif\?cache-bust=)[0-9]+', 
-                    f'\\1{new_cache_version}', 
-                    readme_content
-                )
-                
-                # 기존 파라미터가 없는 경우 anime-retro.gif를 찾아 파라미터 추가
-                if updated_content == readme_content:
-                    updated_content = re.sub(
-                        r'(anime-retro\.gif)(?!\?)', 
-                        f'\\1?cache-bust={new_cache_version}', 
-                        readme_content
-                    )
-                
+
+                lines = readme_content.split('\n')
+                in_comment = False
+                new_lines = []
+
+                def update_line(line):
+                    if 'anime-retro.gif?cache-bust=' in line:
+                        return re.sub(
+                            r'(anime-retro\.gif\?cache-bust=)[0-9]+',
+                            f'\\1{new_cache_version}',
+                            line
+                        )
+                    elif 'anime-retro.gif' in line and '?cache-bust=' not in line:
+                        return line.replace(
+                            'anime-retro.gif',
+                            f'anime-retro.gif?cache-bust={new_cache_version}'
+                        )
+                    else:
+                        return line
+
+                for line in lines:
+                    if '<!--' in line:
+                        in_comment = True
+                    if '-->' in line:
+                        in_comment = False
+                        new_lines.append(line)
+                        continue
+
+                    if not in_comment:
+                        new_lines.append(update_line(line))
+                    else:
+                        new_lines.append(line)
+
+                updated_content = '\n'.join(new_lines)
+
                 with open("README.md", "w") as f:
                     f.write(updated_content)
-                
-                print("Updated README.md with new cache busting parameter")
+
+                print("✅ README.md에 cache-bust 파라미터가 안전하게 갱신되었습니다.")
             except Exception as e:
-                print(f"Error updating README.md: {e}")
+                print(f"❌ README.md 수정 중 오류 발생: {e}")
       shell: python
 
     - name: Commit and push
