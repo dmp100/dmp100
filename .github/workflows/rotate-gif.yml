@@ -2,8 +2,8 @@ name: Daily GIF Rotation at KST Midnight
 
 on:
   schedule:
-    - cron: "5 15 * * *"  # 한국 시간 00:05 (UTC+9 기준)
-  workflow_dispatch:       # 수동 실행 가능
+    - cron: "5 15 * * *"  # 한국 시간 00:05
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -41,7 +41,7 @@ jobs:
         target_file = "anime-retro.gif"
         cache_version_file = "cache_version.txt"
 
-        # GIF 목록 불러오기
+        # GIF 디렉토리 검사
         if not os.path.exists(gif_dir):
             print(f"Creating directory: {gif_dir}")
             os.makedirs(gif_dir)
@@ -55,6 +55,7 @@ jobs:
             print("No GIFs found in the 'gifs' directory.")
             exit(0)
 
+        # 인덱스 로딩
         index = 0
         if os.path.exists(index_file):
             try:
@@ -65,6 +66,7 @@ jobs:
             except Exception as e:
                 print(f"Error reading index file: {e}")
 
+        # 캐시 버전 로딩
         cache_version = 1
         if os.path.exists(cache_version_file):
             try:
@@ -75,6 +77,7 @@ jobs:
             except Exception as e:
                 print(f"Error reading cache version file: {e}")
 
+        # 인덱스 계산 및 파일 복사
         index = index % len(gifs)
         selected = gifs[index]
         print(f"Selected GIF: {selected} (index {index})")
@@ -85,10 +88,12 @@ jobs:
         shutil.copyfile(os.path.join(gif_dir, selected), target_file)
         print(f"Copied {selected} to {target_file}")
 
+        # 인덱스 업데이트
         next_index = (index + 1) % len(gifs)
         with open(index_file, "w") as f:
             f.write(f"{next_index}\n# Last updated: {current_time}")
 
+        # 캐시 버전 업데이트
         new_cache_version = cache_version + 1
         with open(cache_version_file, "w") as f:
             f.write(str(new_cache_version))
@@ -97,7 +102,7 @@ jobs:
         print(f"Updated cache version to {new_cache_version}")
         print(f"Next GIF will be: {gifs[next_index]}")
 
-        # README.md 캐시 버스팅 안전 업데이트
+        # README.md 업데이트 (cache-bust)
         if os.path.exists("README.md"):
             try:
                 with open("README.md", "r") as f:
@@ -108,19 +113,12 @@ jobs:
                 new_lines = []
 
                 def update_line(line):
-                    if 'anime-retro.gif?cache-bust=' in line:
-                        return re.sub(
-                            r'(anime-retro\.gif\?cache-bust=)[0-9]+',
-                            f'\\1{new_cache_version}',
-                            line
-                        )
-                    elif 'anime-retro.gif' in line and '?cache-bust=' not in line:
-                        return line.replace(
-                            'anime-retro.gif',
-                            f'anime-retro.gif?cache-bust={new_cache_version}'
-                        )
-                    else:
-                        return line
+                    # 정확히 anime-retro.gif에만 적용
+                    return re.sub(
+                        r'(anime-retro\.gif)(\?cache-bust=\d+)?',
+                        f'anime-retro.gif?cache-bust={new_cache_version}',
+                        line
+                    )
 
                 for line in lines:
                     if '<!--' in line:
