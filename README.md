@@ -1,7 +1,7 @@
 <p align="center">
  
   <!-- <a href="https://user-images.githubusercontent.com/107687577/226801966-d6e476d3-569d-4b53-b052-4be67151443a.gif"> -->
-   <img src="anime-retro.gif?cache-bust=20" width="800" height="600" alt="lum"></a>
+   <img src="anime-retro.gif?cache-bust=21" width="800" height="600" alt="lum"></a>
   
 </p>
 <!--
