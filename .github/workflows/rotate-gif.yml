@@ -2,11 +2,12 @@ name: Daily GIF Rotation at KST Midnight
 
 on:
   schedule:
-    - cron: "5 15 * * *"  # 한국 시간 00:05
+    - cron: '30 15 * * *'  # 한국 시간 00:05
+  workflow_dispatch:
   push:
     branches:
       - main
-  workflow_dispatch:
+
 
 permissions:
   contents: write
